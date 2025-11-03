@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  # Sequential Thinking MCP Server - SSE Mode
+  # Runs the server with Server-Sent Events transport on HTTP
+  sequential-thinking-sse:
+    build:
+      context: ../..
+      dockerfile: src/sequentialthinking/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - DISABLE_THOUGHT_LOGGING=false
+    command: ["sse"]
+    restart: unless-stopped
+
+  # Sequential Thinking MCP Server - stdio Mode
+  # Runs the server with standard input/output (requires interactive terminal)
+  sequential-thinking-stdio:
+    build:
+      context: ../..
+      dockerfile: src/sequentialthinking/Dockerfile
+    command: ["stdio"]
+    stdin_open: true
+    tty: true

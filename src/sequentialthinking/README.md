@@ -37,6 +37,40 @@ The Sequential Thinking tool is designed for:
 - Tasks that need to maintain context over multiple steps
 - Situations where irrelevant information needs to be filtered out
 
+## Transport Modes
+
+The Sequential Thinking server supports two transport modes:
+
+### stdio (default)
+Standard input/output communication, suitable for local CLI usage and tools like Claude Desktop.
+
+```bash
+npx -y @modelcontextprotocol/server-sequential-thinking
+# or
+node dist/index.js
+# or
+node dist/index.js stdio
+```
+
+### sse
+Server-Sent Events over HTTP, suitable for web-based clients and Docker deployments.
+
+```bash
+node dist/index.js sse
+```
+
+The SSE server runs on port 3001 by default (configurable via `PORT` environment variable).
+
+**Example with custom port:**
+```bash
+PORT=3002 node dist/index.js sse
+```
+
+## Environment Variables
+
+- `PORT`: Port number for SSE server (default: 3001)
+- `DISABLE_THOUGHT_LOGGING`: Set to `true` to disable thought logging output (default: false)
+
 ## Configuration
 
 ### Usage with Claude Desktop
@@ -59,7 +93,7 @@ Add this to your `claude_desktop_config.json`:
 }
 ```
 
-#### docker
+#### docker (stdio mode)
 
 ```json
 {
@@ -77,8 +111,46 @@ Add this to your `claude_desktop_config.json`:
 }
 ```
 
-To disable logging of thought information set env var: `DISABLE_THOUGHT_LOGGING` to `true`.
-Comment
+#### docker (SSE mode)
+
+For web-based clients or when you need HTTP access:
+
+```json
+{
+  "mcpServers": {
+    "sequentialthinking-sse": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-p", "3001:3001",
+        "mcp/sequentialthinking",
+        "sse"
+      ]
+    }
+  }
+}
+```
+
+With custom port:
+
+```json
+{
+  "mcpServers": {
+    "sequentialthinking-sse": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-p", "3002:3002",
+        "-e", "PORT=3002",
+        "mcp/sequentialthinking",
+        "sse"
+      ]
+    }
+  }
+}
+```
 
 ### Usage with VS Code
 
@@ -114,7 +186,7 @@ For NPX installation:
 }
 ```
 
-For Docker installation:
+For Docker installation (stdio mode):
 
 ```json
 {
@@ -132,12 +204,158 @@ For Docker installation:
 }
 ```
 
+For Docker installation (SSE mode):
+
+```json
+{
+  "servers": {
+    "sequential-thinking-sse": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-p", "3001:3001",
+        "mcp/sequentialthinking",
+        "sse"
+      ]
+    }
+  }
+}
+```
+
 ## Building
 
 Docker:
 
 ```bash
 docker build -t mcp/sequentialthinking -f src/sequentialthinking/Dockerfile .
+```
+
+## Production with Docker Compose (Dual Endpoint)
+
+A `docker-compose.yml` file is provided that runs the MCP server with both HTTP and HTTPS endpoints through an nginx reverse proxy.
+
+### Architecture
+
+```
+┌──────────────┐         ┌──────────────┐
+│ Claude Code  │────────>│   Port 3002  │
+└──────────────┘  HTTP   │   (HTTP)     │
+                          │              │
+┌──────────────┐         │    Nginx     │
+│Cursor/       │────────>│   Port 8043  │
+│Windsurf      │  HTTPS  │   (HTTPS)    │
+└──────────────┘         └──────┬───────┘
+                                 │
+                          ┌──────▼───────┐
+                          │  MCP Server  │
+                          │  Port 3001   │
+                          └──────────────┘
+```
+
+### Quick Start
+
+```bash
+# Start all services (backend + nginx proxy)
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop all services
+docker-compose down
+```
+
+### Test Endpoints
+
+```bash
+# Test HTTP endpoint (for Claude Code)
+curl http://localhost:3002/health
+curl -N http://localhost:3002/sse
+
+# Test HTTPS endpoint (for Cursor/Windsurf)
+curl -k https://localhost:8043/health
+curl -k -N https://localhost:8043/sse
+```
+
+### Configuration
+
+**Claude Code** (`~/.claude/mcp.json`):
+```json
+{
+  "mcpServers": {
+    "sequential-thinking": {
+      "url": "http://localhost:3002/sse",
+      "transport": "sse"
+    }
+  }
+}
+```
+
+**Cursor/Windsurf** (see [CURSOR-WINDSURF-CONFIG.md](../../docs/CURSOR-WINDSURF-CONFIG.md)):
+```json
+{
+  "mcpServers": {
+    "sequential-thinking": {
+      "url": "https://localhost:8043/sse",
+      "transport": "sse"
+    }
+  }
+}
+```
+
+### SSL Certificate
+
+The HTTPS endpoint uses a self-signed certificate. For production use or to avoid certificate warnings:
+
+1. Trust the certificate (see [HTTPS-SETUP.md](../../docs/HTTPS-SETUP.md))
+2. Or use a valid certificate from Let's Encrypt
+
+### Multi-Architecture Support
+
+The Docker image supports both ARM64 (Apple Silicon) and AMD64 (Intel/AMD) architectures:
+
+```bash
+# Images are built for both platforms automatically
+docker-compose build
+```
+
+### Environment Variables
+
+- `PORT` - Backend server port (default: 3001)
+- `DISABLE_THOUGHT_LOGGING` - Disable thought logging (default: false)
+
+### Managing Services
+
+```bash
+# Start services
+docker-compose up -d
+
+# Restart specific service
+docker-compose restart sequential-thinking-sse
+docker-compose restart nginx-proxy
+
+# View logs
+docker-compose logs -f sequential-thinking-sse
+docker-compose logs -f nginx-proxy
+
+# Stop and remove containers
+docker-compose down
+
+# Rebuild and restart
+docker-compose up -d --build
+```
+
+## Development with Docker Compose
+
+For local development without the nginx proxy:
+
+```bash
+# Run backend directly on port 3001
+docker run -p 3001:3001 -e PORT=3001 seq_think_sse:1.0 sse
+
+# Test the SSE endpoint
+curl -N http://localhost:3001/sse
 ```
 
 ## License

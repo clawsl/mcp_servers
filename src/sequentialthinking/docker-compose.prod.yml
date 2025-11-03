@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  # MCP SSE Server (backend)
+  sequential-thinking-sse:
+    image: seq_think_sse:1.0
+    container_name: sequential-thinking-sse
+    build:
+      context: ../..
+      dockerfile: src/sequentialthinking/Dockerfile
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    environment:
+      - PORT=3001
+      - DISABLE_THOUGHT_LOGGING=false
+    command: ["sse"]
+    restart: unless-stopped
+    networks:
+      - mcp_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3001/sse"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Nginx Dual Proxy (HTTP + HTTPS)
+  nginx-proxy:
+    image: nginx:alpine
+    container_name: mcp-nginx-proxy
+    ports:
+      - "3002:3002"    # HTTP for Claude Code
+      - "8043:8043"    # HTTPS for Cursor/Windsurf
+    volumes:
+      - ./nginx/nginx-dual.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - sequential-thinking-sse
+    restart: unless-stopped
+    networks:
+      - mcp_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+networks:
+  mcp_network:
+    driver: bridge
