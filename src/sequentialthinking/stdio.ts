@@ -7,7 +7,14 @@ import {
   ListToolsRequestSchema,
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
-import { SequentialThinkingServer } from './lib.js';
+import { SequentialThinkingServer, type SequentialThinkingConfig } from './lib.js';
+import {
+  logSecurityEvent,
+  logInfo,
+  logError,
+  SecuritySeverity,
+  SecurityEventType
+} from './logger.js';
 
 const SEQUENTIAL_THINKING_TOOL: Tool = {
   name: "sequentialthinking",
@@ -113,7 +120,7 @@ You should:
   }
 };
 
-export function createServer() {
+export function createServer(config: SequentialThinkingConfig = {}) {
   const server = new Server(
     {
       name: "sequential-thinking-server",
@@ -126,7 +133,7 @@ export function createServer() {
     }
   );
 
-  const thinkingServer = new SequentialThinkingServer();
+  const thinkingServer = new SequentialThinkingServer(config);
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: [SEQUENTIAL_THINKING_TOOL],
@@ -153,10 +160,18 @@ async function runServer() {
   const { server } = createServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
+
+  logSecurityEvent(
+    SecurityEventType.SERVER_STARTED,
+    SecuritySeverity.INFO,
+    'Sequential Thinking MCP Server started in stdio mode',
+    {}
+  );
   console.error("Sequential Thinking MCP Server running on stdio");
 }
 
 runServer().catch((error) => {
+  logError("Fatal error running server", error);
   console.error("Fatal error running server:", error);
   process.exit(1);
 });

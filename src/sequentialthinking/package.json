@@ -14,7 +14,10 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc && shx chmod +x dist/*.js",
+    "prebuild": "npm run clean",
+    "build": "tsc && npm run build:bundle && shx chmod +x dist/*.js",
+    "build:bundle": "esbuild dist/index.js --bundle --platform=node --outfile=dist/bundle.js --minify --sourcemap",
+    "clean": "shx rm -rf dist",
     "prepare": "npm run build",
     "watch": "tsc --watch",
     "start": "node dist/index.js",
@@ -26,15 +29,23 @@
     "chalk": "^5.3.0",
     "cors": "^2.8.5",
     "express": "^4.21.1",
+    "express-rate-limit": "^7.1.5",
+    "joi": "^17.11.0",
+    "winston": "^3.11.0",
+    "winston-daily-rotate-file": "^4.7.1",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.0",
+    "@types/joi": "^17.2.3",
     "@types/node": "^22",
+    "@types/supertest": "^6.0.2",
     "@types/yargs": "^17.0.32",
     "@vitest/coverage-v8": "^2.1.8",
+    "esbuild": "^0.24.0",
     "shx": "^0.3.4",
+    "supertest": "^6.3.3",
     "typescript": "^5.3.3",
     "vitest": "^2.1.8"
   }
