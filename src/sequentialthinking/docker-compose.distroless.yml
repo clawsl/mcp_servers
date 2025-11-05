@@ -28,7 +28,7 @@
 #
 # ================================================================
 
-version: '3.8'
+# version: '3.8'
 
 services:
   # ================================================================
@@ -138,7 +138,7 @@ services:
 
     # Bind to localhost only for security
     ports:
-      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:3002:3001"
 
     # Optional: Custom network (for isolation)
     # networks:
@@ -179,7 +179,7 @@ services:
 
       # Monitoring labels
       - "monitoring.prometheus.scrape=true"
-      - "monitoring.prometheus.port=3001"
+      - "monitoring.prometheus.port=3002"
       - "monitoring.prometheus.path=/health"
 
 # ================================================================

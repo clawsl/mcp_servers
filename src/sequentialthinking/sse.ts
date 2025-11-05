@@ -1,7 +1,7 @@
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import express from "express";
 import cors from 'cors';
-import { createServer } from "./stdio.js";
+import { createServer } from "./server.js";
 import {
   logSecurityEvent,
   logInfo,

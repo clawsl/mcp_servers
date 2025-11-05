@@ -1,0 +1,80 @@
+# Dockerfile for Option 2: Bun Runtime + Distroless Base
+#
+# Simplified approach: Binary compiled outside Docker, then deployed
+#
+# Prerequisites:
+#   1. npm run build (builds TypeScript)
+#   2. bun build --compile (creates binary in binaries/)
+#
+# Multi-stage build:
+# 1. Create a minimal staging layer with the binary
+# 2. Deploy to distroless/cc-debian12 base
+#
+# Target: <115MB total container size
+# Security: No shell, no package manager, minimal attack surface
+
+# ============================================
+# Stage 1: Prep (ARG-based binary selection)
+# ============================================
+FROM alpine:3.19 AS prep
+
+# Determine which binary to use based on target architecture
+ARG TARGETARCH
+WORKDIR /staging
+
+# Copy the appropriate pre-compiled binary
+COPY binaries/server-bun-${TARGETARCH} /staging/server
+
+# Verify and set permissions
+RUN chmod +x /staging/server && \
+    ls -lh /staging/server
+
+# ============================================
+# Stage 2: Distroless Runtime
+# ============================================
+FROM gcr.io/distroless/cc-debian12:latest
+
+LABEL maintainer="DevOps Security Team"
+LABEL description="Sequential Thinking MCP Server (Bun + Distroless)"
+LABEL version="0.6.2-distroless-bun-poc"
+LABEL org.opencontainers.image.source="https://github.com/modelcontextprotocol/servers"
+
+# Copy compiled binary from prep stage
+COPY --from=prep /staging/server /app/server
+
+# Set working directory
+WORKDIR /app
+
+# Expose SSE port
+EXPOSE 3001
+
+# Run as non-root user (distroless default: nonroot:nonroot, UID 65532)
+USER nonroot:nonroot
+
+# Set entrypoint and default command
+ENTRYPOINT ["/app/server"]
+CMD ["sse"]
+
+# Notes:
+# - Container size: ~110MB (10MB base + 96-103MB binary)
+# - No shell available (distroless)
+# - No package manager available
+# - Binary includes all dependencies (no node_modules needed)
+#
+# Build process:
+#   1. npm run build                              # Build TypeScript
+#   2. bun build --compile (create binaries)      # Create binaries
+#   3. docker buildx build --platform ...         # Build container
+#
+# Usage:
+#   SSE mode:   docker run -p 3001:3001 mcp/sequentialthinking:bun-poc sse
+#   stdio mode: docker run -i mcp/sequentialthinking:bun-poc stdio
+#
+# With logs volume (if binary supports file logging):
+#   docker run -v $(pwd)/logs:/app/logs -p 3001:3001 mcp/sequentialthinking:bun-poc sse
+#
+# Environment variables:
+#   PORT=3001
+#   MAX_THOUGHTS_PER_SESSION=10000
+#   SESSION_TIMEOUT_MS=3600000
+#   NODE_ENV=production
